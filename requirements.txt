@@ -1,0 +1,2 @@
+fastapi==0.104.1
+sqlitecloud==1.1.3

@@ -1,16 +1,129 @@
 from fastapi import FastAPI, Request
- 
 import json
-import sqlite3
- 
- 
+import os
+
+# JSON Database helper functions
+def load_json_db():
+    db_path = "/tmp/database.json"
+    try:
+        if os.path.exists(db_path):
+            with open(db_path, 'r') as f:
+                return json.load(f)
+    except:
+        pass
+    
+    # Default structure
+    return {
+        "users": [],
+        "courses": [],
+        "next_user_id": 1,
+        "next_course_id": 1
+    }
+
+def save_json_db(data):
+    db_path = "/tmp/database.json"
+    try:
+        with open(db_path, 'w') as f:
+            json.dump(data, f)
+    except:
+        pass
+
 def connect_db():
-    conn = sqlite3.connect("users.db")
-    return conn
- 
+    # Simulate SQLite connection but return JSON data
+    class MockConnection:
+        def __init__(self):
+            self.data = load_json_db()
+        
+        def cursor(self):
+            return MockCursor(self.data)
+        
+        def commit(self):
+            save_json_db(self.data)
+        
+        def close(self):
+            pass
+    
+    return MockConnection()
+
+class MockCursor:
+    def __init__(self, data):
+        self.data = data
+        self.results = []
+        self.rowcount = 0
+    
+    def execute(self, query, params=()):
+        query = query.strip().upper()
+        
+        if query.startswith("SELECT * FROM USERS"):
+            self.results = [(user["id"], user["username"], user["password"]) 
+                          for user in self.data["users"]]
+        
+        elif query.startswith("INSERT INTO USERS"):
+            username, password = params
+            new_user = {
+                "id": self.data["next_user_id"],
+                "username": username,
+                "password": password
+            }
+            self.data["users"].append(new_user)
+            self.data["next_user_id"] += 1
+            self.results = []
+        
+        elif query.startswith("SELECT ID FROM USERS WHERE USERNAME"):
+            username = params[0]
+            for user in self.data["users"]:
+                if user["username"] == username:
+                    self.results = [(user["id"],)]
+                    return
+            self.results = []
+        
+        elif query.startswith("UPDATE USERS SET PASSWORD"):
+            password, username = params
+            for user in self.data["users"]:
+                if user["username"] == username:
+                    user["password"] = password
+                    self.rowcount = 1
+                    return
+            self.rowcount = 0
+        
+        elif query.startswith("DELETE FROM USERS"):
+            username, password = params
+            for i, user in enumerate(self.data["users"]):
+                if user["username"] == username and user["password"] == password:
+                    # Also delete user's courses
+                    user_id = user["id"]
+                    self.data["courses"] = [c for c in self.data["courses"] if c["user_id"] != user_id]
+                    del self.data["users"][i]
+                    self.rowcount = 1
+                    return
+            self.rowcount = 0
+        
+        elif query.startswith("INSERT INTO COURSES"):
+            name, author, duration, user_id = params
+            new_course = {
+                "id": self.data["next_course_id"],
+                "name": name,
+                "author": author,
+                "duration": duration,
+                "user_id": user_id
+            }
+            self.data["courses"].append(new_course)
+            self.data["next_course_id"] += 1
+            self.results = []
+        
+        elif query.startswith("SELECT * FROM COURSES WHERE USER_ID"):
+            user_id = params[0]
+            self.results = [(course["id"], course["name"], course["author"], course["duration"], course["user_id"])
+                          for course in self.data["courses"] if course["user_id"] == user_id]
+    
+    def fetchall(self):
+        return self.results
+    
+    def fetchone(self):
+        return self.results[0] if self.results else None
+
 app = FastAPI()
- 
- 
+
 @app.get("/users")
 def read_users():
     #1. get conn object
@@ -164,11 +277,3 @@ def user_courses(username):
     conn.close()
 
     return rows
-
-
-
-#POST - /courses - name, duration, author
-#GET - /courses - Get All courses from DB
-#DELETE - /courses/{id} - Delete the course
-#PATCH - /courses/{id} - Update the course details
-    
