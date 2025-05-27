@@ -4,27 +4,45 @@ import os
 
 # JSON Database helper functions
 def load_json_db():
-    db_path = "/tmp/database.json"
+    db_path = "db.json"  # Root level db.json
     try:
         if os.path.exists(db_path):
             with open(db_path, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                # If empty JSON {}, populate with default data
+                if not data or len(data) == 0:
+                    return get_default_data()
+                return data
     except:
         pass
     
-    # Default structure
+    # Default structure with sample users
+    return get_default_data()
+
+def get_default_data():
     return {
-        "users": [],
-        "courses": [],
-        "next_user_id": 1,
-        "next_course_id": 1
+        "users": [
+            {"id": 1, "username": "john_doe", "password": "password123"},
+            {"id": 2, "username": "jane_smith", "password": "mypass456"},
+            {"id": 3, "username": "admin", "password": "admin123"},
+            {"id": 4, "username": "student1", "password": "study789"},
+            {"id": 5, "username": "teacher", "password": "teach2024"}
+        ],
+        "courses": [
+            {"id": 1, "name": "Python Basics", "author": "John Doe", "duration": "4 weeks", "user_id": 1},
+            {"id": 2, "name": "Web Development", "author": "Jane Smith", "duration": "6 weeks", "user_id": 2},
+            {"id": 3, "name": "Data Science", "author": "Admin User", "duration": "8 weeks", "user_id": 3},
+            {"id": 4, "name": "Machine Learning", "author": "Teacher", "duration": "10 weeks", "user_id": 5}
+        ],
+        "next_user_id": 6,
+        "next_course_id": 5
     }
 
 def save_json_db(data):
-    db_path = "/tmp/database.json"
+    db_path = "db.json"  # Root level db.json
     try:
         with open(db_path, 'w') as f:
-            json.dump(data, f)
+            json.dump(data, f, indent=2)
     except:
         pass
 
